@@ -41,6 +41,6 @@ func createTracesProcessor(
 		set,
 		cfg,
 		nextConsumer,
-		newSpanAttributesProcessor(set.Logger, cfg).processTraces,
+		newBackstageProcessor(set.Logger, cfg).processTraces,
 		processorhelper.WithCapabilities(processorCapabilities))
 }

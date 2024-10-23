@@ -4,20 +4,29 @@ import (
 	"context"
 
 	"go.opentelemetry.io/collector/component"
+	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/ptrace"
+	conventions "go.opentelemetry.io/collector/semconv/v1.7.0"
 	"go.uber.org/zap"
 )
 
-type spanAttributesProcessor struct {
-	logger *zap.Logger
-	config Config
-	labels map[string]RepoInfo
+// span keys
+const (
+	orgKey      = "backstage.org"
+	divisionKey = "backstage.division"
+	unknown     = "unknown"
+)
+
+type backstageprocessor struct {
+	logger       *zap.Logger
+	config       Config
+	backstageMap map[string]RepoInfo
 }
 
 // newTracesProcessor returns a processor that adds attributes to all the spans.
 // To construct the attributes processors, the use of the factory methods are required
 // in order to validate the inputs.
-func newSpanAttributesProcessor(logger *zap.Logger, config component.Config) *spanAttributesProcessor {
+func newBackstageProcessor(logger *zap.Logger, config component.Config) *backstageprocessor {
 	cfg := config.(*Config)
 	logger.Info("Fetching Backstage labels", zap.String("endpoint", cfg.Endpoint))
 	labels, err := getRepositoryLabelsMap(cfg.Endpoint, string(cfg.Token))
@@ -75,41 +84,57 @@ func newSpanAttributesProcessor(logger *zap.Logger, config component.Config) *sp
 	}
 	// end of fake labels
 
-	return &spanAttributesProcessor{
-		config: *cfg,
-		logger: logger,
-		labels: labels,
+	return &backstageprocessor{
+		config:       *cfg,
+		logger:       logger,
+		backstageMap: labels,
 	}
 }
 
-func (a *spanAttributesProcessor) processTraces(ctx context.Context, td ptrace.Traces) (ptrace.Traces, error) {
-	rss := td.ResourceSpans()
-	for i := 0; i < rss.Len(); i++ {
-		rs := rss.At(i)
-		ilss := rs.ScopeSpans()
-		for j := 0; j < ilss.Len(); j++ {
-			ils := ilss.At(j)
-			spans := ils.Spans()
-			for k := 0; k < spans.Len(); k++ {
-				span := spans.At(k)
-				attrs := span.Attributes()
-				if repo, found := attrs.Get("service.name"); found {
-					a.logger.Info("Found service name", zap.String("service.name", repo.Str()))
-					org := "unknown"
-					division := "unknown"
-					repoinfo, ok := a.labels[repo.Str()]
-					if ok {
-						org = repoinfo.Org
-						division = repoinfo.Division
-					}
-					attrs.PutStr("backstage.division", division)
-					attrs.PutStr("backstage.org", org)
+// processTraces processes the incoming data
+// and returns the data to be sent to the next component
+func (b *backstageprocessor) processTraces(ctx context.Context, batch ptrace.Traces) (ptrace.Traces, error) {
+	for i := 0; i < batch.ResourceSpans().Len(); i++ {
+		rs := batch.ResourceSpans().At(i)
+		b.processResourceSpan(ctx, rs)
+	}
 
-				} else {
-					a.logger.Info("Not found service name", zap.Any("attributes", attrs))
-				}
-			}
+	return batch, nil
+}
+
+// processResourceSpan processes the RS and all of its spans
+func (b *backstageprocessor) processResourceSpan(ctx context.Context, rs ptrace.ResourceSpans) {
+	rsAttrs := rs.Resource().Attributes()
+
+	// Attributes can be part of a resource span
+	b.processAttrs(ctx, rsAttrs)
+
+	for j := 0; j < rs.ScopeSpans().Len(); j++ {
+		ils := rs.ScopeSpans().At(j)
+		for k := 0; k < ils.Spans().Len(); k++ {
+			span := ils.Spans().At(k)
+			spanAttrs := span.Attributes()
+
+			// Attributes can also be part of span
+			b.processAttrs(ctx, spanAttrs)
 		}
 	}
-	return td, nil
+}
+
+// processAttrs adds backstage metadata tags to resource based on service.name map
+func (b *backstageprocessor) processAttrs(_ context.Context, attributes pcommon.Map) {
+	if repo, found := attributes.Get(conventions.AttributeServiceName); found {
+		b.logger.Info("Found service name", zap.String(conventions.AttributeServiceName, repo.Str()))
+		org := unknown
+		division := unknown
+		repoinfo, ok := b.backstageMap[repo.Str()]
+		if ok {
+			org = repoinfo.Org
+			division = repoinfo.Division
+		}
+		attributes.PutStr(divisionKey, division)
+		attributes.PutStr(orgKey, org)
+	} else {
+		b.logger.Info("Not found service name", zap.Any("attributes", attributes))
+	}
 }
