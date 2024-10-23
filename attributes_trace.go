@@ -28,47 +28,47 @@ func newSpanAttributesProcessor(logger *zap.Logger, config component.Config) *sp
 	logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
 
 	// for demo purposes let's also create some fake labels
-	labels["demo-devops-ingress-nginx"] = RepoInfo{
+	labels["demo-devops-bcn-ingress-nginx"] = RepoInfo{
 		Repo:     "ingress-nginx",
 		Org:      "open-source",
 		Division: "engineering",
 	}
-	labels["demo-devops-elasticsearch"] = RepoInfo{
+	labels["demo-devops-bcn-elasticsearch"] = RepoInfo{
 		Repo:     "elasticsearch ",
 		Org:      "platform",
 		Division: "engineering",
 	}
-	labels["demo-devops-apm-server"] = RepoInfo{
+	labels["demo-devops-bcn-apm-server"] = RepoInfo{
 		Repo:     "apm-server",
 		Org:      "obs",
 		Division: "engineering",
 	}
-	labels["demo-devops-opentelemetry-lambda"] = RepoInfo{
+	labels["demo-devops-bcn-opentelemetry-lambda"] = RepoInfo{
 		Repo:     "opentelemetry-lambda",
 		Org:      "open-source",
 		Division: "engineering",
 	}
-	labels["demo-devops-elastic-otel-node"] = RepoInfo{
+	labels["demo-devops-bcn-elastic-otel-node"] = RepoInfo{
 		Repo:     "elastic-otel-node",
 		Org:      "obs",
 		Division: "engineering",
 	}
-	labels["demo-devops-elastic-otel-java"] = RepoInfo{
+	labels["demo-devops-bcn-elastic-otel-java"] = RepoInfo{
 		Repo:     "elastic-otel-java",
 		Org:      "obs",
 		Division: "engineering",
 	}
-	labels["demo-devops-setup-go"] = RepoInfo{
+	labels["demo-devops-bcn-setup-go"] = RepoInfo{
 		Repo:     "setup-go",
 		Org:      "open-source",
 		Division: "engineering",
 	}
-	labels["demo-devops-demo"] = RepoInfo{
+	labels["demo-devops-bcn-demo"] = RepoInfo{
 		Repo:     "demo",
 		Org:      "platform",
 		Division: "engineering",
 	}
-	labels["demo-devops-codeql-action"] = RepoInfo{
+	labels["demo-devops-bcn-codeql-action"] = RepoInfo{
 		Repo:     "codeql-action",
 		Org:      "platform",
 		Division: "engineering",
@@ -95,12 +95,18 @@ func (a *spanAttributesProcessor) processTraces(ctx context.Context, td ptrace.T
 				attrs := span.Attributes()
 				if repo, found := attrs.Get("service.name"); found {
 					a.logger.Info("Found service name", zap.String("service.name", repo.Str()))
+					org := "unknown"
+					division := "unknown"
 					repoinfo, ok := a.labels[repo.Str()]
-					if !ok {
-						continue
+					if ok {
+						org = repoinfo.Org
+						division = repoinfo.Division
 					}
-					attrs.PutStr("backstage.division", repoinfo.Division)
-					attrs.PutStr("backstage.org", repoinfo.Org)
+					attrs.PutStr("backstage.division", division)
+					attrs.PutStr("backstage.org", org)
+
+				} else {
+					a.logger.Info("Not found service name", zap.Any("attributes", attrs))
 				}
 			}
 		}
