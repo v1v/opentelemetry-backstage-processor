@@ -41,14 +41,74 @@ func newBackstageProcessor(logger *zap.Logger, config component.Config) *backsta
 	}
 	logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
 
-	// for demo purposes let's also create some fake labels
+	// Append demo labels to the existing labels
+	createDemoLabels(labels)
+
+	return &backstageprocessor{
+		config:       *cfg,
+		logger:       logger,
+		backstageMap: labels,
+	}
+}
+
+// processTraces processes the incoming data
+// and returns the data to be sent to the next component
+func (b *backstageprocessor) processTraces(ctx context.Context, batch ptrace.Traces) (ptrace.Traces, error) {
+	for i := 0; i < batch.ResourceSpans().Len(); i++ {
+		rs := batch.ResourceSpans().At(i)
+		b.processResourceSpan(ctx, rs)
+	}
+	return batch, nil
+}
+
+// processResourceSpan processes the RS and all of its spans
+func (b *backstageprocessor) processResourceSpan(ctx context.Context, rs ptrace.ResourceSpans) {
+	rsAttrs := rs.Resource().Attributes()
+
+	// Attributes can be part of a resource span
+	b.processAttrs(ctx, rsAttrs)
+
+	for j := 0; j < rs.ScopeSpans().Len(); j++ {
+		ils := rs.ScopeSpans().At(j)
+		for k := 0; k < ils.Spans().Len(); k++ {
+			span := ils.Spans().At(k)
+			spanAttrs := span.Attributes()
+
+			// Attributes can also be part of span
+			b.processAttrs(ctx, spanAttrs)
+		}
+	}
+}
+
+// processAttrs adds backstage metadata tags to resource based on service.name map
+func (b *backstageprocessor) processAttrs(_ context.Context, attributes pcommon.Map) {
+	if repo, found := attributes.Get(conventions.AttributeServiceName); found {
+		b.logger.Debug("Found service name", zap.String(conventions.AttributeServiceName, repo.Str()))
+		org := unknown
+		division := unknown
+		repoinfo, ok := b.backstageMap[repo.Str()]
+		if ok {
+			org = repoinfo.Org
+			division = repoinfo.Division
+		}
+		attributes.PutStr(divisionKey, division)
+		attributes.PutStr(orgKey, org)
+	} else {
+		b.logger.Debug("Not found service name", zap.Any("attributes", attributes))
+	}
+}
+
+// createDemoLabels only for illustrating how it works in the demo environment.
+func createDemoLabels(original map[string]RepoInfo) {
+	labels := make(map[string]RepoInfo)
+
 	labels["demo-devops-bcn-ingress-nginx"] = RepoInfo{
 		Repo:     "ingress-nginx",
 		Org:      "open-source",
 		Division: "engineering",
 	}
 	labels["demo-devops-bcn-elasticsearch"] = RepoInfo{
-		Repo:     "elasticsearch ",
+		Repo:     "elasticsearch",
 		Org:      "platform",
 		Division: "engineering",
 	}
@@ -87,59 +147,9 @@ func newBackstageProcessor(logger *zap.Logger, config component.Config) *backsta
 		Org:      "platform",
 		Division: "engineering",
 	}
-	// end of fake labels
 
-	return &backstageprocessor{
-		config:       *cfg,
-		logger:       logger,
-		backstageMap: labels,
-	}
-}
-
-// processTraces processes the incoming data
-// and returns the data to be sent to the next component
-func (b *backstageprocessor) processTraces(ctx context.Context, batch ptrace.Traces) (ptrace.Traces, error) {
-	for i := 0; i < batch.ResourceSpans().Len(); i++ {
-		rs := batch.ResourceSpans().At(i)
-		b.processResourceSpan(ctx, rs)
+	for key, value := range labels {
+		original[key] = value
 	}
 
-	return batch, nil
-}
-
-// processResourceSpan processes the RS and all of its spans
-func (b *backstageprocessor) processResourceSpan(ctx context.Context, rs ptrace.ResourceSpans) {
-	rsAttrs := rs.Resource().Attributes()
-
-	// Attributes can be part of a resource span
-	b.processAttrs(ctx, rsAttrs)
-
-	for j := 0; j < rs.ScopeSpans().Len(); j++ {
-		ils := rs.ScopeSpans().At(j)
-		for k := 0; k < ils.Spans().Len(); k++ {
-			span := ils.Spans().At(k)
-			spanAttrs := span.Attributes()
-
-			// Attributes can also be part of span
-			b.processAttrs(ctx, spanAttrs)
-		}
-	}
-}
-
-// processAttrs adds backstage metadata tags to resource based on service.name map
-func (b *backstageprocessor) processAttrs(_ context.Context, attributes pcommon.Map) {
-	if repo, found := attributes.Get(conventions.AttributeServiceName); found {
-		b.logger.Info("Found service name", zap.String(conventions.AttributeServiceName, repo.Str()))
-		org := unknown
-		division := unknown
-		repoinfo, ok := b.backstageMap[repo.Str()]
-		if ok {
-			org = repoinfo.Org
-			division = repoinfo.Division
-		}
-		attributes.PutStr(divisionKey, division)
-		attributes.PutStr(orgKey, org)
-	} else {
-		b.logger.Info("Not found service name", zap.Any("attributes", attributes))
-	}
 }
