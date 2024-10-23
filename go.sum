@@ -59,12 +59,16 @@ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
 github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsTg=
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
+github.com/tdabasinskas/go-backstage/v2 v2.5.1 h1:MwI+vXAgG0/JJkglfUhBK5qJ+49XE3A3tW2ev8yt7fg=
+github.com/tdabasinskas/go-backstage/v2 v2.5.1/go.mod h1:UmQPTGP9mxwbtxmAzru1pa6oczDSK0Gs4pku1NOkLos=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.opentelemetry.io/collector v0.102.0 h1:xRY7aUMKRR+Ls7HqZrs4haGApdrs9+KiGlx76lq4Nq8=
 go.opentelemetry.io/collector v0.102.0/go.mod h1:+Ay+kMhmcnJ+bVtVPEOwU4td0SnvCGwUK1w9Jh76Zj8=
 go.opentelemetry.io/collector/component v0.102.0 h1:9AH7RIgX0Xc/tb34BxEDQwThY7GihwZWF0SbtYx9HtA=
 go.opentelemetry.io/collector/component v0.102.0/go.mod h1:RArpKhkv2o0k9Ea0Weg0Ryt1sWqrLX2sn7NISt+P7h0=
+go.opentelemetry.io/collector/config/configopaque v1.18.0 h1:aoEecgd5m8iZCX+S+iH6SK/lG6ULqCqtrtz7PeHw7vE=
+go.opentelemetry.io/collector/config/configopaque v1.18.0/go.mod h1:6zlLIyOoRpJJ+0bEKrlZOZon3rOp5Jrz9fMdR4twOS4=
 go.opentelemetry.io/collector/config/configtelemetry v0.102.0 h1:gusHa1X0NpzwDSc2Th1gRYEGAWcD1EdXPV4hwJWxYaA=
 go.opentelemetry.io/collector/config/configtelemetry v0.102.0/go.mod h1:WxWKNVAQJg/Io1nA3xLgn/DWLE/W1QOB2+/Js3ACi40=
 go.opentelemetry.io/collector/config/configtelemetry v0.111.0 h1:Q3TJRM2A3FIDjIvzWa3uFArsdFN0I/0GzcWynHjC+oY=

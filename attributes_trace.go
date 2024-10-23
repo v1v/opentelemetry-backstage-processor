@@ -11,6 +11,7 @@ import (
 type spanAttributesProcessor struct {
 	logger *zap.Logger
 	config Config
+	labels map[string]RepoInfo
 }
 
 // newTracesProcessor returns a processor that adds attributes to all the spans.
@@ -18,9 +19,17 @@ type spanAttributesProcessor struct {
 // in order to validate the inputs.
 func newSpanAttributesProcessor(logger *zap.Logger, config component.Config) *spanAttributesProcessor {
 	cfg := config.(*Config)
+	logger.Info("Fetching Backstage labels", zap.String("endpoint", cfg.Endpoint))
+	labels, err := getRepositoryLabelsMap(cfg.Endpoint, string(cfg.Token))
+
+	if err != nil {
+		logger.Error("Failed to fetch labels", zap.Error(err))
+	}
+	logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
 	return &spanAttributesProcessor{
 		config: *cfg,
 		logger: logger,
+		labels: labels,
 	}
 }
 
@@ -35,10 +44,14 @@ func (a *spanAttributesProcessor) processTraces(ctx context.Context, td ptrace.T
 			for k := 0; k < spans.Len(); k++ {
 				span := spans.At(k)
 				attrs := span.Attributes()
-				if _, found := attrs.Get("MyKey"); found {
-					continue
+				if repo, found := attrs.Get("service.name"); found {
+					repoinfo, ok := a.labels[repo.Str()]
+					if !ok {
+						continue
+					}
+					attrs.PutStr("backstage.division", repoinfo.Division)
+					attrs.PutStr("backstage.org", repoinfo.Org)
 				}
-				attrs.PutStr("MyKey", "MyValue")
 			}
 		}
 	}
