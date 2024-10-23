@@ -5,6 +5,7 @@ import (
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
+	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.7.0"
 	"go.uber.org/zap"
@@ -29,6 +30,9 @@ type backstageprocessor struct {
 func newBackstageProcessor(logger *zap.Logger, config component.Config) *backstageprocessor {
 	cfg := config.(*Config)
 	logger.Info("Fetching Backstage labels", zap.String("endpoint", cfg.Endpoint))
+
+	// eventually this should support some dynamism in the labels
+	// so new labels can be picked up without a restart
 	labels, err := getRepositoryLabelsMap(cfg.Endpoint, string(cfg.Token))
 
 	if err != nil {
@@ -98,6 +102,32 @@ func (b *backstageprocessor) processAttrs(_ context.Context, attributes pcommon.
 	}
 }
 
+// processLogs processes the incoming data
+// and returns the data to be sent to the next component
+func (b *backstageprocessor) processLogs(ctx context.Context, logs plog.Logs) (plog.Logs, error) {
+	for i := 0; i < logs.ResourceLogs().Len(); i++ {
+		rl := logs.ResourceLogs().At(i)
+		b.processResourceLog(ctx, rl)
+	}
+	return logs, nil
+}
+
+// processResourceLog processes the log resource and all of its logs and then returns the last
+// view metric context. The context can be used for tests
+func (s *backstageprocessor) processResourceLog(ctx context.Context, rl plog.ResourceLogs) {
+	rsAttrs := rl.Resource().Attributes()
+
+	s.processAttrs(ctx, rsAttrs)
+
+	for j := 0; j < rl.ScopeLogs().Len(); j++ {
+		ils := rl.ScopeLogs().At(j)
+		for k := 0; k < ils.LogRecords().Len(); k++ {
+			log := ils.LogRecords().At(k)
+			s.processAttrs(ctx, log.Attributes())
+		}
+	}
+}
+
 // createDemoLabels only for illustrating how it works in the demo environment.
 func createDemoLabels(original map[string]RepoInfo) {
 	labels := make(map[string]RepoInfo)
@@ -151,5 +181,4 @@ func createDemoLabels(original map[string]RepoInfo) {
 	for key, value := range labels {
 		original[key] = value
 	}
-
 }

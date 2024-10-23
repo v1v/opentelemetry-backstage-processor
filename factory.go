@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	TracesStability  = component.StabilityLevelBeta
-	MetricsStability = component.StabilityLevelBeta
-	LogsStability    = component.StabilityLevelBeta
+	TracesStability = component.StabilityLevelAlpha
+	LogsStability   = component.StabilityLevelAlpha
 )
 
 var processorCapabilities = consumer.Capabilities{MutatesData: true}
@@ -27,7 +26,8 @@ func NewFactory() processor.Factory {
 	return processor.NewFactory(
 		component.MustNewType("backstageprocessor"),
 		createDefaultConfig,
-		processor.WithTraces(createTracesProcessor, TracesStability))
+		processor.WithTraces(createTracesProcessor, TracesStability),
+		processor.WithLogs(createLogsProcessor, LogsStability))
 }
 
 func createTracesProcessor(
@@ -36,11 +36,33 @@ func createTracesProcessor(
 	cfg component.Config,
 	nextConsumer consumer.Traces,
 ) (processor.Traces, error) {
+
+	// need to find out how we can create the maps with the labels once
+	// rather than one per type of processor as it is done in the createLogsProcessor
+	// function below.
+	processor := newBackstageProcessor(set.Logger, cfg)
 	return processorhelper.NewTracesProcessor(
 		ctx,
 		set,
 		cfg,
 		nextConsumer,
-		newBackstageProcessor(set.Logger, cfg).processTraces,
+		processor.processTraces,
+		processorhelper.WithCapabilities(processorCapabilities))
+}
+
+func createLogsProcessor(
+	ctx context.Context,
+	set processor.CreateSettings,
+	cfg component.Config,
+	nextLogsConsumer consumer.Logs,
+) (processor.Logs, error) {
+
+	processor := newBackstageProcessor(set.Logger, cfg)
+	return processorhelper.NewLogsProcessor(
+		ctx,
+		set,
+		cfg,
+		nextLogsConsumer,
+		processor.processLogs,
 		processorhelper.WithCapabilities(processorCapabilities))
 }

@@ -1,5 +1,11 @@
 # opentelemetry-backstage-processor
 
+| Status        |           |
+| ------------- |-----------|
+| Stability     | [alpha]: traces, logs   |
+
+[alpha]: https://github.com/open-telemetry/opentelemetry-collector#alpha
+
 ## Local Development
 
 ### Prerequisites
