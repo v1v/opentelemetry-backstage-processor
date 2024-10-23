@@ -32,7 +32,12 @@ func newBackstageProcessor(logger *zap.Logger, config component.Config) *backsta
 	labels, err := getRepositoryLabelsMap(cfg.Endpoint, string(cfg.Token))
 
 	if err != nil {
-		logger.Error("Failed to fetch labels", zap.Error(err))
+		logger.Error("Failed to fetch the Backstage labels", zap.Error(err))
+		return &backstageprocessor{
+			config:       *cfg,
+			logger:       logger,
+			backstageMap: map[string]RepoInfo{},
+		}
 	}
 	logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
 
