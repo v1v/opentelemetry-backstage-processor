@@ -45,6 +45,7 @@ func (a *spanAttributesProcessor) processTraces(ctx context.Context, td ptrace.T
 				span := spans.At(k)
 				attrs := span.Attributes()
 				if repo, found := attrs.Get("service.name"); found {
+					a.logger.Info("Found service name", zap.String("service.name", repo.Str()))
 					repoinfo, ok := a.labels[repo.Str()]
 					if !ok {
 						continue
