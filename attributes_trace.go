@@ -26,6 +26,55 @@ func newSpanAttributesProcessor(logger *zap.Logger, config component.Config) *sp
 		logger.Error("Failed to fetch labels", zap.Error(err))
 	}
 	logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
+
+	// for demo purposes let's also create some fake labels
+	labels["demo-devops-ingress-nginx"] = RepoInfo{
+		Repo:     "ingress-nginx",
+		Org:      "open-source",
+		Division: "engineering",
+	}
+	labels["demo-devops-elasticsearch"] = RepoInfo{
+		Repo:     "elasticsearch ",
+		Org:      "platform",
+		Division: "engineering",
+	}
+	labels["demo-devops-apm-server"] = RepoInfo{
+		Repo:     "apm-server",
+		Org:      "obs",
+		Division: "engineering",
+	}
+	labels["demo-devops-opentelemetry-lambda"] = RepoInfo{
+		Repo:     "opentelemetry-lambda",
+		Org:      "open-source",
+		Division: "engineering",
+	}
+	labels["demo-devops-elastic-otel-node"] = RepoInfo{
+		Repo:     "elastic-otel-node",
+		Org:      "obs",
+		Division: "engineering",
+	}
+	labels["demo-devops-elastic-otel-java"] = RepoInfo{
+		Repo:     "elastic-otel-java",
+		Org:      "obs",
+		Division: "engineering",
+	}
+	labels["demo-devops-setup-go"] = RepoInfo{
+		Repo:     "setup-go",
+		Org:      "open-source",
+		Division: "engineering",
+	}
+	labels["demo-devops-demo"] = RepoInfo{
+		Repo:     "demo",
+		Org:      "platform",
+		Division: "engineering",
+	}
+	labels["demo-devops-codeql-action"] = RepoInfo{
+		Repo:     "codeql-action",
+		Org:      "platform",
+		Division: "engineering",
+	}
+	// end of fake labels
+
 	return &spanAttributesProcessor{
 		config: *cfg,
 		logger: logger,
