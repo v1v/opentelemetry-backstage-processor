@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	TracesStability = component.StabilityLevelAlpha
-	LogsStability   = component.StabilityLevelAlpha
+	LogsStability    = component.StabilityLevelAlpha
+	MetricsStability = component.StabilityLevelAlpha
+	TracesStability  = component.StabilityLevelAlpha
 )
 
 var processorCapabilities = consumer.Capabilities{MutatesData: true}
@@ -26,8 +27,9 @@ func NewFactory() processor.Factory {
 	return processor.NewFactory(
 		component.MustNewType("backstageprocessor"),
 		createDefaultConfig,
-		processor.WithTraces(createTracesProcessor, TracesStability),
-		processor.WithLogs(createLogsProcessor, LogsStability))
+		processor.WithMetrics(createMetricsProcessor, MetricsStability),
+		processor.WithLogs(createLogsProcessor, LogsStability),
+		processor.WithTraces(createTracesProcessor, TracesStability))
 }
 
 func createTracesProcessor(
@@ -64,5 +66,23 @@ func createLogsProcessor(
 		cfg,
 		nextLogsConsumer,
 		processor.processLogs,
+		processorhelper.WithCapabilities(processorCapabilities))
+}
+
+func createMetricsProcessor(
+	ctx context.Context,
+	set processor.CreateSettings,
+	cfg component.Config,
+	nextConsumer consumer.Metrics,
+) (processor.Metrics, error) {
+
+	processor := newBackstageProcessor(set.Logger, cfg)
+
+	return processorhelper.NewMetricsProcessor(
+		ctx,
+		set,
+		cfg,
+		nextConsumer,
+		processor.processMetrics,
 		processorhelper.WithCapabilities(processorCapabilities))
 }

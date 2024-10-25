@@ -6,12 +6,13 @@ import (
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
 	"go.opentelemetry.io/collector/pdata/plog"
+	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 	conventions "go.opentelemetry.io/collector/semconv/v1.7.0"
 	"go.uber.org/zap"
 )
 
-// span keys
+// atribute keys
 const (
 	orgKey      = "backstage.org"
 	divisionKey = "backstage.division"
@@ -24,7 +25,7 @@ type backstageprocessor struct {
 	backstageMap map[string]RepoInfo
 }
 
-// newTracesProcessor returns a processor that adds attributes to all the spans.
+// newBackstageProcessor returns a processor that adds attributes to all the spans, logs and metrics.
 // To construct the attributes processors, the use of the factory methods are required
 // in order to validate the inputs.
 func newBackstageProcessor(logger *zap.Logger, config component.Config) *backstageprocessor {
@@ -114,71 +115,72 @@ func (b *backstageprocessor) processLogs(ctx context.Context, logs plog.Logs) (p
 
 // processResourceLog processes the log resource and all of its logs and then returns the last
 // view metric context. The context can be used for tests
-func (s *backstageprocessor) processResourceLog(ctx context.Context, rl plog.ResourceLogs) {
+func (b *backstageprocessor) processResourceLog(ctx context.Context, rl plog.ResourceLogs) {
 	rsAttrs := rl.Resource().Attributes()
 
-	s.processAttrs(ctx, rsAttrs)
+	b.processAttrs(ctx, rsAttrs)
 
 	for j := 0; j < rl.ScopeLogs().Len(); j++ {
 		ils := rl.ScopeLogs().At(j)
 		for k := 0; k < ils.LogRecords().Len(); k++ {
 			log := ils.LogRecords().At(k)
-			s.processAttrs(ctx, log.Attributes())
+			b.processAttrs(ctx, log.Attributes())
 		}
 	}
 }
 
-// createDemoLabels only for illustrating how it works in the demo environment.
-func createDemoLabels(original map[string]RepoInfo) {
-	labels := make(map[string]RepoInfo)
+// processMetrics process metrics and add the backstage lable metadata.
+func (b *backstageprocessor) processMetrics(ctx context.Context, metrics pmetric.Metrics) (pmetric.Metrics, error) {
+	for i := 0; i < metrics.ResourceMetrics().Len(); i++ {
+		rm := metrics.ResourceMetrics().At(i)
+		b.processResourceMetric(ctx, rm)
+	}
+	return metrics, nil
+}
 
-	labels["demo-devops-bcn-ingress-nginx"] = RepoInfo{
-		Repo:     "ingress-nginx",
-		Org:      "open-source",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-elasticsearch"] = RepoInfo{
-		Repo:     "elasticsearch",
-		Org:      "platform",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-apm-server"] = RepoInfo{
-		Repo:     "apm-server",
-		Org:      "obs",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-opentelemetry-lambda"] = RepoInfo{
-		Repo:     "opentelemetry-lambda",
-		Org:      "open-source",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-elastic-otel-node"] = RepoInfo{
-		Repo:     "elastic-otel-node",
-		Org:      "obs",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-elastic-otel-java"] = RepoInfo{
-		Repo:     "elastic-otel-java",
-		Org:      "obs",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-setup-go"] = RepoInfo{
-		Repo:     "setup-go",
-		Org:      "open-source",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-demo"] = RepoInfo{
-		Repo:     "demo",
-		Org:      "platform",
-		Division: "engineering",
-	}
-	labels["demo-devops-bcn-codeql-action"] = RepoInfo{
-		Repo:     "codeql-action",
-		Org:      "platform",
-		Division: "engineering",
-	}
+func (b *backstageprocessor) processResourceMetric(ctx context.Context, rm pmetric.ResourceMetrics) {
+	rsAttrs := rm.Resource().Attributes()
 
-	for key, value := range labels {
-		original[key] = value
+	b.processAttrs(ctx, rsAttrs)
+
+	for j := 0; j < rm.ScopeMetrics().Len(); j++ {
+		ils := rm.ScopeMetrics().At(j)
+		for k := 0; k < ils.Metrics().Len(); k++ {
+			metric := ils.Metrics().At(k)
+			b.processMetricAttributes(ctx, metric)
+		}
+	}
+}
+
+// processMetricAttributes Attributes are provided for each log and trace, but not at the metric level
+// Need to process attributes for every data point within a metric.
+func (b *backstageprocessor) processMetricAttributes(ctx context.Context, metric pmetric.Metric) {
+	switch metric.Type() {
+	case pmetric.MetricTypeGauge:
+		dps := metric.Gauge().DataPoints()
+		for i := 0; i < dps.Len(); i++ {
+			b.processAttrs(ctx, dps.At(i).Attributes())
+		}
+	case pmetric.MetricTypeSum:
+		dps := metric.Sum().DataPoints()
+		for i := 0; i < dps.Len(); i++ {
+			b.processAttrs(ctx, dps.At(i).Attributes())
+		}
+	case pmetric.MetricTypeHistogram:
+		dps := metric.Histogram().DataPoints()
+		for i := 0; i < dps.Len(); i++ {
+			b.processAttrs(ctx, dps.At(i).Attributes())
+		}
+	case pmetric.MetricTypeExponentialHistogram:
+		dps := metric.ExponentialHistogram().DataPoints()
+		for i := 0; i < dps.Len(); i++ {
+			b.processAttrs(ctx, dps.At(i).Attributes())
+		}
+	case pmetric.MetricTypeSummary:
+		dps := metric.Summary().DataPoints()
+		for i := 0; i < dps.Len(); i++ {
+			b.processAttrs(ctx, dps.At(i).Attributes())
+		}
+	case pmetric.MetricTypeEmpty:
 	}
 }
