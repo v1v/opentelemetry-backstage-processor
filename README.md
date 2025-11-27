@@ -2,63 +2,84 @@
 
 | Status        |           |
 | ------------- |-----------|
-| Stability     | [alpha]: traces, logs   |
+| Stability     | [alpha]: traces, logs, metrics   |
 
 [alpha]: https://github.com/open-telemetry/opentelemetry-collector#alpha
 
-## Local Development
+The Backstage processor enriches telemetry data (traces, logs, and metrics) with organizational metadata from [Backstage](https://backstage.io/). It automatically adds `backstage.org` and `backstage.division` attributes based on the `service.name` resource attribute, enabling better observability and organization of telemetry data.
 
-### Prerequisites
+## How It Works
 
-- [Go](https://golang.org/dl/)
-- [Gh](https://cli.github.com/)
+The processor:
+1. Fetches repository metadata from Backstage API on startup
+2. Matches `service.name` from telemetry against Backstage entities
+3. Adds organizational attributes (`backstage.org`, `backstage.division`) to all telemetry signals
+4. Optionally refreshes metadata periodically in the background
 
-### Install tools
+## Configuration
 
-#### Ngrok
+```yaml
+processors:
+  backstageprocessor:
+    # The Backstage API endpoint URL
+    # Required
+    endpoint: "https://backstage.example.com"
 
-The [Ngrok](https://ngrok.com/download/) can be installed by running:
+    # Authentication token for Backstage API
+    # Required. Supports environment variable expansion: ${env:BACKSTAGE_TOKEN}
+    token: "your-api-token"
 
-```shell
-make install-ngrok
+    # Interval for automatic background refresh of Backstage metadata
+    # Optional. If not specified or set to 0, metadata is fetched only once at startup.
+    # Recommended: 5m to 15m for most use cases.
+    # Examples: 30s, 5m, 1h
+    # default = 0 (disabled)
+    refresh_interval: 1h
 ```
 
-#### ocb
+### Complete Example
 
-The [OpenTelemetry Collector Builder (OCB)](https://opentelemetry.io/docs/collector/custom-collector/) can be installed by running:
+```yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
 
-```shell
-make install-ocb
+processors:
+  batch:
+  backstageprocessor:
+    endpoint: "https://api.backstage.example.com"
+    token: "${env:BACKSTAGE_API_TOKEN}"
+    refresh_interval: 5m
+
+exporters:
+  otlp:
+    endpoint: "https://observability.example.com:4317"
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, backstageprocessor]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      processors: [backstageprocessor]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      processors: [backstageprocessor]
+      exporters: [otlp]
 ```
 
-### Build the collector
+## Attributes Added
 
-```shell
-make build
-```
+The processor adds the following attributes to all telemetry signals:
 
-### Configure your GitHub repository for testing purposes
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| `backstage.org` | Organization/team owning the service | `platform-team` |
+| `backstage.division` | Business division or department | `engineering` |
 
-Open one terminal and run
-
-```shell
-make ngrok
-```
-
-Copy the `ngrok` URL and go to your GitHub repository, in this case we use `elastic/oblt-project-tmpl`:
-
-* https://github.com/elastic/oblt-project-tmpl/settings/hooks
-  * Payload: `https://3012-37-133-56-13.ngrok-free.app/githubactionsannotations` or the relevant `ngrok` URL
-  * Content type: `application/json`
-  * Secret: `secret` - fixed for now for testing purposes
-  * `Enable SSL verification`
-  * Individual events:
-    * Workflow runs
-    * Workflow jobs
-
-
-### Run the collector
-
-```shell
-make run
-```
+If a service is not found in Backstage, the attributes are set to `"unknown"`.
