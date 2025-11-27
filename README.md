@@ -16,6 +16,8 @@ The processor:
 3. Adds organizational attributes (`backstage.org`, `backstage.division`) to all telemetry signals
 4. Optionally refreshes metadata periodically in the background
 
+For detailed information about the implementation and potential issues, see [BACKGROUND_REFRESH.md](docs/BACKGROUND_REFRESH.md).
+
 ## Configuration
 
 ```yaml

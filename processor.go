@@ -2,6 +2,8 @@ package backstageprocessor
 
 import (
 	"context"
+	"sync"
+	"time"
 
 	"go.opentelemetry.io/collector/component"
 	"go.opentelemetry.io/collector/pdata/pcommon"
@@ -24,6 +26,9 @@ type backstageprocessor struct {
 	logger       *zap.Logger
 	config       Config
 	backstageMap map[string]RepoInfo
+	mapMu        sync.RWMutex // Protects backstageMap for concurrent access
+	cancel       context.CancelFunc
+	done         chan struct{}
 }
 
 // newBackstageProcessor returns a processor that adds attributes to all the spans, logs and metrics.
@@ -33,25 +38,31 @@ func newBackstageProcessor(logger *zap.Logger, config component.Config) *backsta
 	cfg := config.(*Config)
 	logger.Info("Fetching Backstage labels", zap.String("endpoint", cfg.Endpoint))
 
-	// eventually this should support some dynamism in the labels
-	// so new labels can be picked up without a restart
 	labels, err := getRepositoryLabelsMap(cfg.Endpoint, string(cfg.Token))
 
 	if err != nil {
 		logger.Error("Failed to fetch the Backstage labels", zap.Error(err))
-		return &backstageprocessor{
-			config:       *cfg,
-			logger:       logger,
-			backstageMap: map[string]RepoInfo{},
-		}
+		labels = map[string]RepoInfo{}
+	} else {
+		logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
 	}
-	logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
 
-	return &backstageprocessor{
+	processor := &backstageprocessor{
 		config:       *cfg,
 		logger:       logger,
 		backstageMap: labels,
 	}
+
+	// Start background refresh if interval is configured
+	if cfg.RefreshInterval > 0 {
+		ctx, cancel := context.WithCancel(context.Background())
+		processor.cancel = cancel
+		processor.done = make(chan struct{})
+		logger.Info("Starting background refresh", zap.Duration("interval", cfg.RefreshInterval))
+		go processor.refreshLoop(ctx)
+	}
+
+	return processor
 }
 
 // processTraces processes the incoming data
@@ -83,13 +94,48 @@ func (b *backstageprocessor) processResourceSpan(ctx context.Context, rs ptrace.
 	}
 }
 
+// refreshLoop periodically refreshes the backstage labels map
+func (b *backstageprocessor) refreshLoop(ctx context.Context) {
+	defer close(b.done)
+
+	ticker := time.NewTicker(b.config.RefreshInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			b.logger.Info("Stopping refresh loop")
+			return
+		case <-ticker.C:
+			b.logger.Debug("Refreshing backstage labels")
+			newMap, err := getRepositoryLabelsMap(b.config.Endpoint, string(b.config.Token))
+			if err != nil {
+				b.logger.Error("Failed to refresh backstage labels", zap.Error(err))
+				continue
+			}
+
+			// Update map with write lock
+			b.mapMu.Lock()
+			b.backstageMap = newMap
+			b.mapMu.Unlock()
+
+			b.logger.Info("Successfully refreshed backstage labels", zap.Int("count", len(newMap)))
+		}
+	}
+}
+
 // processAttrs adds backstage metadata tags to resource based on service.name map
 func (b *backstageprocessor) processAttrs(_ context.Context, attributes pcommon.Map) {
 	if repo, found := attributes.Get(serviceNameKey); found {
 		b.logger.Debug("Found service name", zap.String(serviceNameKey, repo.Str()))
 		org := unknown
 		division := unknown
+
+		// Thread-safe read access to backstageMap
+		b.mapMu.RLock()
 		repoinfo, ok := b.backstageMap[repo.Str()]
+		b.mapMu.RUnlock()
+
 		if ok {
 			org = repoinfo.Org
 			division = repoinfo.Division
@@ -181,4 +227,22 @@ func (b *backstageprocessor) processMetricAttributes(ctx context.Context, metric
 		}
 	case pmetric.MetricTypeEmpty:
 	}
+}
+
+// Shutdown gracefully shuts down the processor, stopping the background refresh loop if running
+func (b *backstageprocessor) Shutdown(ctx context.Context) error {
+	if b.cancel != nil {
+		b.logger.Info("Shutting down backstage processor")
+		b.cancel()
+
+		// Wait for refresh loop to finish or context to timeout
+		select {
+		case <-b.done:
+			b.logger.Info("Refresh loop stopped successfully")
+		case <-ctx.Done():
+			b.logger.Warn("Shutdown context timeout while waiting for refresh loop")
+			return ctx.Err()
+		}
+	}
+	return nil
 }
