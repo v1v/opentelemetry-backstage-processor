@@ -48,10 +48,10 @@ func TestCreateTracesProcessor(t *testing.T) {
 	backstageCfg.Endpoint = "https://backstage.example.com"
 	backstageCfg.Token = "test-token"
 
-	set := processortest.NewNopCreateSettings()
+	set := processortest.NewNopSettings(component.MustNewType("backstageprocessor"))
 	nextConsumer := consumertest.NewNop()
 
-	tp, err := factory.CreateTracesProcessor(context.Background(), set, cfg, nextConsumer)
+	tp, err := createTracesProcessor(context.Background(), set, cfg, nextConsumer)
 	if err != nil {
 		t.Fatalf("CreateTracesProcessor failed: %v", err)
 	}
@@ -68,10 +68,10 @@ func TestCreateLogsProcessor(t *testing.T) {
 	backstageCfg.Endpoint = "https://backstage.example.com"
 	backstageCfg.Token = "test-token"
 
-	set := processortest.NewNopCreateSettings()
+	set := processortest.NewNopSettings(component.MustNewType("backstageprocessor"))
 	nextConsumer := consumertest.NewNop()
 
-	lp, err := factory.CreateLogsProcessor(context.Background(), set, cfg, nextConsumer)
+	lp, err := createLogsProcessor(context.Background(), set, cfg, nextConsumer)
 	if err != nil {
 		t.Fatalf("CreateLogsProcessor failed: %v", err)
 	}
@@ -88,10 +88,10 @@ func TestCreateMetricsProcessor(t *testing.T) {
 	backstageCfg.Endpoint = "https://backstage.example.com"
 	backstageCfg.Token = "test-token"
 
-	set := processortest.NewNopCreateSettings()
+	set := processortest.NewNopSettings(component.MustNewType("backstageprocessor"))
 	nextConsumer := consumertest.NewNop()
 
-	mp, err := factory.CreateMetricsProcessor(context.Background(), set, cfg, nextConsumer)
+	mp, err := createMetricsProcessor(context.Background(), set, cfg, nextConsumer)
 	if err != nil {
 		t.Fatalf("CreateMetricsProcessor failed: %v", err)
 	}

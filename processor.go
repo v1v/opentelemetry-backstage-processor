@@ -8,9 +8,10 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	conventions "go.opentelemetry.io/collector/semconv/v1.7.0"
 	"go.uber.org/zap"
 )
+
+const serviceNameKey = "service.name"
 
 // atribute keys
 const (
@@ -87,8 +88,8 @@ func (b *backstageprocessor) processResourceSpan(ctx context.Context, rs ptrace.
 
 // processAttrs adds backstage metadata tags to resource based on service.name map
 func (b *backstageprocessor) processAttrs(_ context.Context, attributes pcommon.Map) {
-	if repo, found := attributes.Get(conventions.AttributeServiceName); found {
-		b.logger.Debug("Found service name", zap.String(conventions.AttributeServiceName, repo.Str()))
+	if repo, found := attributes.Get(serviceNameKey); found {
+		b.logger.Debug("Found service name", zap.String(serviceNameKey, repo.Str()))
 		org := unknown
 		division := unknown
 		repoinfo, ok := b.backstageMap[repo.Str()]

@@ -34,7 +34,7 @@ func NewFactory() processor.Factory {
 
 func createTracesProcessor(
 	ctx context.Context,
-	set processor.CreateSettings,
+	set processor.Settings,
 	cfg component.Config,
 	nextConsumer consumer.Traces,
 ) (processor.Traces, error) {
@@ -43,7 +43,7 @@ func createTracesProcessor(
 	// rather than one per type of processor as it is done in the createLogsProcessor
 	// function below.
 	processor := newBackstageProcessor(set.Logger, cfg)
-	return processorhelper.NewTracesProcessor(
+	return processorhelper.NewTraces(
 		ctx,
 		set,
 		cfg,
@@ -54,13 +54,13 @@ func createTracesProcessor(
 
 func createLogsProcessor(
 	ctx context.Context,
-	set processor.CreateSettings,
+	set processor.Settings,
 	cfg component.Config,
 	nextLogsConsumer consumer.Logs,
 ) (processor.Logs, error) {
 
 	processor := newBackstageProcessor(set.Logger, cfg)
-	return processorhelper.NewLogsProcessor(
+	return processorhelper.NewLogs(
 		ctx,
 		set,
 		cfg,
@@ -71,14 +71,14 @@ func createLogsProcessor(
 
 func createMetricsProcessor(
 	ctx context.Context,
-	set processor.CreateSettings,
+	set processor.Settings,
 	cfg component.Config,
 	nextConsumer consumer.Metrics,
 ) (processor.Metrics, error) {
 
 	processor := newBackstageProcessor(set.Logger, cfg)
 
-	return processorhelper.NewMetricsProcessor(
+	return processorhelper.NewMetrics(
 		ctx,
 		set,
 		cfg,

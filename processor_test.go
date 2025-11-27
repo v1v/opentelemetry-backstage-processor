@@ -8,7 +8,6 @@ import (
 	"go.opentelemetry.io/collector/pdata/plog"
 	"go.opentelemetry.io/collector/pdata/pmetric"
 	"go.opentelemetry.io/collector/pdata/ptrace"
-	conventions "go.opentelemetry.io/collector/semconv/v1.7.0"
 	"go.uber.org/zap"
 )
 
@@ -35,7 +34,7 @@ func TestProcessAttrs(t *testing.T) {
 
 	t.Run("with known service name", func(t *testing.T) {
 		attrs := pcommon.NewMap()
-		attrs.PutStr(conventions.AttributeServiceName, "test-service")
+		attrs.PutStr(serviceNameKey, "test-service")
 
 		processor.processAttrs(context.Background(), attrs)
 
@@ -58,7 +57,7 @@ func TestProcessAttrs(t *testing.T) {
 
 	t.Run("with unknown service name", func(t *testing.T) {
 		attrs := pcommon.NewMap()
-		attrs.PutStr(conventions.AttributeServiceName, "unknown-service")
+		attrs.PutStr(serviceNameKey, "unknown-service")
 
 		processor.processAttrs(context.Background(), attrs)
 
@@ -120,7 +119,7 @@ func TestProcessTraces(t *testing.T) {
 	t.Run("adds backstage attributes to traces", func(t *testing.T) {
 		traces := ptrace.NewTraces()
 		rs := traces.ResourceSpans().AppendEmpty()
-		rs.Resource().Attributes().PutStr(conventions.AttributeServiceName, "trace-service")
+		rs.Resource().Attributes().PutStr(serviceNameKey, "trace-service")
 
 		span := rs.ScopeSpans().AppendEmpty().Spans().AppendEmpty()
 		span.SetName("test-span")
@@ -167,7 +166,7 @@ func TestProcessLogs(t *testing.T) {
 	t.Run("adds backstage attributes to logs", func(t *testing.T) {
 		logs := plog.NewLogs()
 		rl := logs.ResourceLogs().AppendEmpty()
-		rl.Resource().Attributes().PutStr(conventions.AttributeServiceName, "log-service")
+		rl.Resource().Attributes().PutStr(serviceNameKey, "log-service")
 
 		logRecord := rl.ScopeLogs().AppendEmpty().LogRecords().AppendEmpty()
 		logRecord.Body().SetStr("test log message")
@@ -214,14 +213,14 @@ func TestProcessMetrics(t *testing.T) {
 	t.Run("adds backstage attributes to gauge metrics", func(t *testing.T) {
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().PutStr(conventions.AttributeServiceName, "metric-service")
+		rm.Resource().Attributes().PutStr(serviceNameKey, "metric-service")
 
 		metric := rm.ScopeMetrics().AppendEmpty().Metrics().AppendEmpty()
 		metric.SetName("test.gauge")
 		gauge := metric.SetEmptyGauge()
 		dp := gauge.DataPoints().AppendEmpty()
 		dp.SetDoubleValue(42.0)
-		dp.Attributes().PutStr(conventions.AttributeServiceName, "metric-service")
+		dp.Attributes().PutStr(serviceNameKey, "metric-service")
 
 		result, err := processor.processMetrics(context.Background(), metrics)
 		if err != nil {
@@ -255,14 +254,14 @@ func TestProcessMetrics(t *testing.T) {
 	t.Run("adds backstage attributes to sum metrics", func(t *testing.T) {
 		metrics := pmetric.NewMetrics()
 		rm := metrics.ResourceMetrics().AppendEmpty()
-		rm.Resource().Attributes().PutStr(conventions.AttributeServiceName, "metric-service")
+		rm.Resource().Attributes().PutStr(serviceNameKey, "metric-service")
 
 		metric := rm.ScopeMetrics().AppendEmpty().Metrics().AppendEmpty()
 		metric.SetName("test.sum")
 		sum := metric.SetEmptySum()
 		dp := sum.DataPoints().AppendEmpty()
 		dp.SetDoubleValue(100.0)
-		dp.Attributes().PutStr(conventions.AttributeServiceName, "metric-service")
+		dp.Attributes().PutStr(serviceNameKey, "metric-service")
 
 		result, err := processor.processMetrics(context.Background(), metrics)
 		if err != nil {
