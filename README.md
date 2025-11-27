@@ -2,67 +2,86 @@
 
 | Status        |           |
 | ------------- |-----------|
-| Stability     | [alpha]: traces, logs   |
+| Stability     | [alpha]: traces, logs, metrics   |
 
 [alpha]: https://github.com/open-telemetry/opentelemetry-collector#alpha
 
-## Local Development
+The Backstage processor enriches telemetry data (traces, logs, and metrics) with organizational metadata from [Backstage](https://backstage.io/). It automatically adds `backstage.org` and `backstage.division` attributes based on the `service.name` resource attribute, enabling better observability and organization of telemetry data.
 
-### Prerequisites
+## How It Works
 
-- [Go](https://golang.org/dl/)
-- [Gh](https://cli.github.com/)
+The processor:
+1. Fetches repository metadata from Backstage API on startup
+2. Matches `service.name` from telemetry against Backstage entities
+3. Adds organizational attributes (`backstage.org`, `backstage.division`) to all telemetry signals
+4. Optionally refreshes metadata periodically in the background
 
-### Install tools
-
-#### ocb
-
-The [OpenTelemetry Collector Builder (OCB)](https://opentelemetry.io/docs/collector/custom-collector/) can be installed by running:
-
-```shell
-make install-ocb
-```
-
-### Build the collector
-
-```shell
-make build
-```
-
-### Run the collector
-
-```shell
-make run
-```
+For detailed information about the implementation and potential issues, see [BACKGROUND_REFRESH.md](docs/BACKGROUND_REFRESH.md).
 
 ## Configuration
-
-The backstage processor supports the following configuration options:
 
 ```yaml
 processors:
   backstageprocessor:
-    endpoint: "https://backstage.example.com"  # Backstage API endpoint
-    token: "your-api-token"                    # Backstage API token
-    refresh_interval: 2h                       # Optional: refresh labels periodically
+    # The Backstage API endpoint URL
+    # Required
+    endpoint: "https://backstage.example.com"
+
+    # Authentication token for Backstage API
+    # Required. Supports environment variable expansion: ${env:BACKSTAGE_TOKEN}
+    token: "your-api-token"
+
+    # Interval for automatic background refresh of Backstage metadata
+    # Optional. If not specified or set to 0, metadata is fetched only once at startup.
+    # Recommended: 5m to 15m for most use cases.
+    # Examples: 30s, 5m, 1h
+    # default = 0 (disabled)
+    refresh_interval: 1h
 ```
 
-### Configuration Options
+### Complete Example
 
-- `endpoint` (required): The URL of your Backstage API
-- `token` (required): API token for authenticating with Backstage
-- `refresh_interval` (optional): Duration between automatic refreshes of Backstage labels
-  - If not specified or set to `0`, labels are fetched only once at startup
-  - Examples: `30s`, `5m`, `1h`
-  - Recommended: 1h minutes for most use cases
+```yaml
+receivers:
+  otlp:
+    protocols:
+      grpc:
+      http:
 
-### Background Refresh Feature
+processors:
+  batch:
+  backstageprocessor:
+    endpoint: "https://api.backstage.example.com"
+    token: "${env:BACKSTAGE_API_TOKEN}"
+    refresh_interval: 5m
 
-When `refresh_interval` is configured, the processor automatically refreshes Backstage labels in the background without requiring a collector restart. This feature:
+exporters:
+  otlp:
+    endpoint: "https://observability.example.com:4317"
 
-- Uses thread-safe concurrent access patterns
-- Continues processing telemetry during refreshes
-- Handles API failures gracefully without affecting telemetry flow
-- Shuts down cleanly with the collector
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, backstageprocessor]
+      exporters: [otlp]
+    metrics:
+      receivers: [otlp]
+      processors: [backstageprocessor]
+      exporters: [otlp]
+    logs:
+      receivers: [otlp]
+      processors: [backstageprocessor]
+      exporters: [otlp]
+```
 
-For detailed information about the implementation and potential issues, see [BACKGROUND_REFRESH.md](docs/BACKGROUND_REFRESH.md).
+## Attributes Added
+
+The processor adds the following attributes to all telemetry signals:
+
+| Attribute | Description | Example |
+|-----------|-------------|---------|
+| `backstage.org` | Organization/team owning the service | `platform-team` |
+| `backstage.division` | Business division or department | `engineering` |
+
+If a service is not found in Backstage, the attributes are set to `"unknown"`.
