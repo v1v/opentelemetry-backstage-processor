@@ -13,7 +13,7 @@ import (
 
 const serviceNameKey = "service.name"
 
-// atribute keys
+// attribute keys
 const (
 	orgKey      = "backstage.org"
 	divisionKey = "backstage.division"
