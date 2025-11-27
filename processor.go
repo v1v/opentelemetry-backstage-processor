@@ -45,8 +45,6 @@ func newBackstageProcessor(logger *zap.Logger, config component.Config) *backsta
 		labels = map[string]RepoInfo{}
 	} else {
 		logger.Info("Fetched GitHub repositories", zap.Int("number of repositories", len(labels)))
-		// Append demo labels to the existing labels
-		createDemoLabels(labels)
 	}
 
 	processor := &backstageprocessor{
