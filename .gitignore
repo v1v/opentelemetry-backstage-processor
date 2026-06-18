@@ -3,3 +3,4 @@
 /bin
 *private-key.pem
 config.yml
+coverage.*
